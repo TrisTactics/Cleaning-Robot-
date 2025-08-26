@@ -1,0 +1,98 @@
+For this project, I built a cleaning robot using an Arduino Uno, motor driver, ultrasonic sensor, servo motor, and HC-05 Bluetooth module. The robot is designed to navigate autonomously and clean surfaces using a rotating brush mechanism. It also includes manual control via Bluetooth, allowing me to steer the robot and activate cleaning remotely using an Android app.
+The robot uses an ultrasonic sensor to detect obstacles and avoid collisions. When no Bluetooth command is received, it switches to autonomous mode and moves forward while cleaning. If an obstacle is detected within 20 cm, it reverses and turns to find a clear path. The servo motor controls the cleaning brush, which activates during movement and can also be triggered manually.
+I wrote the code to handle both autonomous navigation and Bluetooth commands. I used functions to keep the logic organized and added comments to explain each part. This project helped me understand how sensors, motors, and communication modules work together in a real-world application.
+// My Arduino Cleaning Robot Code
+// Features: Autonomous movement + Bluetooth manual control + Cleaning servo
+
+#include <AFMotor.h>  // Motor driver library
+#include <Servo.h>    // Servo motor library
+
+AF_DCMotor leftMotor(1);   // Left wheel motor
+AF_DCMotor rightMotor(2);  // Right wheel motor
+Servo cleaner;             // Servo for cleaning brush
+
+const int trigPin = 9;     // Ultrasonic sensor trigger
+const int echoPin = 10;    // Ultrasonic sensor echo
+char btCommand;            // Bluetooth command input
+
+void setup() {
+  Serial.begin(9600);      // Start serial for Bluetooth
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  cleaner.attach(6);       // Servo connected to pin 6
+  cleaner.write(90);       // Neutral position
+  leftMotor.setSpeed(200);
+  rightMotor.setSpeed(200);
+}
+
+void loop() {
+  if (Serial.available()) {
+    btCommand = Serial.read();   // Read Bluetooth command
+    manualControl(btCommand);    // Handle manual mode
+  } else {
+    autoNavigate();              // Default to autonomous mode
+  }
+}
+
+// Autonomous navigation using ultrasonic sensor
+void autoNavigate() {
+  long duration, distance;
+
+  // Trigger ultrasonic pulse
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  // Measure distance
+  duration = pulseIn(echoPin, HIGH);
+  distance = duration * 0.034 / 2;
+
+  if (distance < 20) {
+    // Obstacle detected
+    leftMotor.run(BACKWARD);
+    rightMotor.run(BACKWARD);
+    delay(400);
+    leftMotor.run(FORWARD);
+    rightMotor.run(RELEASE);
+    delay(400);
+  } else {
+    // Move forward and clean
+    leftMotor.run(FORWARD);
+    rightMotor.run(FORWARD);
+    cleaner.write(45);  // Activate cleaning
+  }
+}
+
+// Manual control via Bluetooth
+void manualControl(char cmd) {
+  switch (cmd) {
+    case 'F': // Forward
+      leftMotor.run(FORWARD);
+      rightMotor.run(FORWARD);
+      break;
+    case 'B': // Backward
+      leftMotor.run(BACKWARD);
+      rightMotor.run(BACKWARD);
+      break;
+    case 'L': // Turn left
+      leftMotor.run(RELEASE);
+      rightMotor.run(FORWARD);
+      break;
+    case 'R': // Turn right
+      leftMotor.run(FORWARD);
+      rightMotor.run(RELEASE);
+      break;
+    case 'S': // Stop
+      leftMotor.run(RELEASE);
+      rightMotor.run(RELEASE);
+      break;
+    case 'C': // Start cleaning
+      cleaner.write(45);
+      break;
+    case 'X': // Stop cleaning
+      cleaner.write(90);
+      break;
+  }
+}
